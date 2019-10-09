@@ -1,0 +1,16 @@
+---
+
+- src: https://github.com/ganto/ansible-debops-ansible_plugins
+  name: debops.ansible_plugins
+
+- src: https://github.com/ganto/ansible-debops-secret
+  name: debops.secret
+
+- src: https://github.com/ganto/ansible-debops-sshd
+  name: debops.sshd
+
+- src: https://github.com/ganto/ansible-debops-postfix
+  name: debops.postfix
+
+- src: https://git.linuxmonk.ch/ganto/ansible-sssd/archive/master.tar.gz
+  name: ganto.sssd

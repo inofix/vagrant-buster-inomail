@@ -1,0 +1,19 @@
+---
+
+- name: Check for valid kerberos ticket
+  delegate_to: "{{ ipa_server }}"
+  changed_when: false
+  command: klist
+
+- name: Query IPA for host
+  delegate_to: "{{ ipa_server }}"
+  # If host not joined yet, return code 2
+  failed_when: ipa_host_add_register_host_show.rc not in [0, 2]
+  command: ipa host-show "{{ ansible_fqdn }}"
+  register: ipa_host_add_register_host_show
+
+- name: Add host to IPA
+  delegate_to: "{{ ipa_server }}"
+  command: "ipa host-add --ip-address={{ ansible_default_ipv4.address }} {{ ansible_fqdn }}"
+  register: ipa_host_add_register_host_add
+  when: ipa_host_add_register_host_show.rc != 0

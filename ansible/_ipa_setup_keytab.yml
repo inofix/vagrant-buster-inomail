@@ -1,0 +1,52 @@
+---
+
+- name: Create temporary directory
+  delegate_to: "{{ ipa_server }}"
+  tempfile:
+    state: directory
+    prefix: "keytab."
+  vars:
+    ansible_user: "{{ ipa_ssh_user }}"
+    ansible_ssh_private_key_file: "{{ ipa_ssh_private_key_file }}"
+  register: ipa_setup_keytab_register_tempdir
+
+- name: Export host keytab
+  delegate_to: "{{ ipa_server }}"
+  command: "ipa-getkeytab -s {{ ipa_server }} -p host/{{ ansible_fqdn }} -k {{ ipa_setup_keytab_register_tempdir.path }}/krb5.keytab"
+  vars:
+    ansible_user: "{{ ipa_ssh_user }}"
+    ansible_ssh_private_key_file: "{{ ipa_ssh_private_key_file }}"
+
+- name: Fetch keytab from IPA server
+  delegate_to: "{{ ipa_server }}"
+  fetch:
+    src: "{{ ipa_setup_keytab_register_tempdir.path }}/krb5.keytab"
+    # copy file to playbook directory
+    dest: "./"
+    flat: yes
+  vars:
+    ansible_user: "{{ ipa_ssh_user }}"
+    ansible_ssh_private_key_file: "{{ ipa_ssh_private_key_file }}"
+
+- name: Copy keytab to host
+  copy:
+    src: "krb5.keytab"
+    dest: "/etc/krb5.keytab"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Remove temporary directory
+  delegate_to: "{{ ipa_server }}"
+  file:
+    path: "{{ ipa_setup_keytab_register_tempdir.path }}"
+    state: absent
+  vars:
+    ansible_user: "{{ ipa_ssh_user }}"
+    ansible_ssh_private_key_file: "{{ ipa_ssh_private_key_file }}"
+
+- name: Remove temporary keytab
+  delegate_to: localhost
+  file:
+    path: "krb5.keytab"
+    state: absent

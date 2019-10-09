@@ -1,0 +1,77 @@
+---
+
+- hosts: all
+  become: true
+
+  vars:
+    ipa_server: "ipa.oasis.home"
+    # TODO: change this for your setup
+    ipa_ssh_user: "root"
+    ipa_ssh_private_key_file: ~/.ssh/id_admin_rsa
+    ipa_realm: "IPA.OASIS.HOME"
+    sssd_options:
+      krb5_realm: "{{ ipa_realm }}"
+      ldap_tls_cacert: /etc/ipa/ca.crt
+
+  pre_tasks:
+    - name: Check IPA server login
+      delegate_to: "{{ ipa_server }}"
+      ping:
+      vars:
+        ansible_user: "{{ ipa_ssh_user }}"
+        ansible_ssh_private_key_file: "{{ ipa_ssh_private_key_file }}"
+
+    - name: Include tasks to add host to IPA server
+      include_tasks: _ipa_host_add.yml
+      vars:
+        ansible_user: "{{ ipa_ssh_user }}"
+        ansible_ssh_private_key_file: "{{ ipa_ssh_private_key_file }}"
+
+    - name: Query keytab
+      stat:
+        path: /etc/krb5.keytab
+      register: playbook_register_keytab
+
+    - name: Include tasks to install host keytab
+      include_tasks: _ipa_setup_keytab.yml
+      when: not playbook_register_keytab.stat.exists
+
+    - name: Create IPA configuration directory
+      file:
+        path: /etc/ipa
+        owner: root
+        group: root
+        mode: 0755
+        state: directory
+
+    - name: Download IPA CA certificate
+      get_url:
+        url: "https://{{ ipa_server }}/ipa/config/ca.crt"
+        validate_certs: no
+        dest: /etc/ipa/ca.crt
+
+  roles:
+    - name: ganto.sssd
+      vars:
+        sssd__services:
+          - nss
+          - pam
+          - ssh
+          - sudo
+        # TODO: move to sssd role
+        sssd__domain_configs:
+          - "{{ sssd__default_domain_config | combine(sssd_options) }}"
+
+    - name: debops.sshd/env
+
+    - name: debops.sshd
+      vars:
+        sshd__password_authentication: 'yes'
+        sshd__authorized_keys:
+          - '.ssh/authorized_keys'
+        sshd__match_list: []
+        sshd__custom_options: |
+          AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+          AuthorizedKeysCommandUser nobody
+          GSSAPIAuthentication yes
+          GSSAPICleanupCredentials no
